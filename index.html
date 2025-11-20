@@ -1,0 +1,148 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sales Battle</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    *{box-sizing:border-box;font-family:system-ui;}
+    html,body{margin:0;padding:0;height:100%;width:100%;}
+    body{display:flex;background:#090909;color:#fff;}
+    .side{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px;}
+    .side.michael{background:#111827;}
+    .side.niki{background:#1f2937;}
+    .name{font-size:1.4rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;text-align:center;}
+    .bar-wrapper{flex:1;width:80%;max-width:220px;display:flex;align-items:flex-end;justify-content:center;padding:16px 0;}
+    .bar-track{width:60%;max-width:90px;height:100%;border-radius:999px;background:rgba(255,255,255,.12);display:flex;align-items:flex-end;justify-content:center;position:relative;overflow:hidden;}
+    .bar-fill{width:100%;height:0;border-radius:999px;display:flex;align-items:center;justify-content:center;transition:height .25s ease-out;position:relative;}
+    .bar-fill.michael{background:linear-gradient(to top,#f97316,#facc15);}
+    .bar-fill.niki{background:linear-gradient(to top,#06b6d4,#22c55e);}
+    .bar-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;font-size:1rem;font-weight:600;text-shadow:0 0 6px rgba(0,0,0,.7);}
+    .controls{padding-top:8px;}
+    button.add-btn{width:64px;height:64px;border-radius:999px;border:none;font-size:2rem;font-weight:600;cursor:pointer;background:#fef3c7;color:#111827;box-shadow:0 8px 18px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;outline:none;}
+    .side.niki button.add-btn{background:#cffafe;color:#0f172a;}
+    button.add-btn:active{transform:translateY(1px) scale(.98);box-shadow:0 4px 10px rgba(0,0,0,.5);}
+    .hint{font-size:.8rem;opacity:.7;margin-top:4px;text-align:center;}
+    .status{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:.75rem;opacity:.7;}
+  </style>
+</head>
+<body>
+  <div class="side michael">
+    <div><div class="name">Michael</div></div>
+    <div class="bar-wrapper">
+      <div class="bar-track">
+        <div class="bar-fill michael" id="michaelBar">
+          <div class="bar-label" id="michaelTotalInside">$0</div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="add-btn" id="michaelAdd">+</button>
+      <div class="hint">Tap to add / subtract</div>
+    </div>
+  </div>
+
+  <div class="side niki">
+    <div><div class="name">Niki</div></div>
+    <div class="bar-wrapper">
+      <div class="bar-track">
+        <div class="bar-fill niki" id="nikiBar">
+          <div class="bar-label" id="nikiTotalInside">$0</div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="add-btn" id="nikiAdd">+</button>
+      <div class="hint">Tap to add / subtract</div>
+    </div>
+  </div>
+
+  <div class="status" id="statusText">Disconnected</div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDslTALLXFai2kQnJ8giHF37RnGcce7lis",
+      authDomain: "sales-cd3ab.firebaseapp.com",
+      databaseURL: "https://sales-cd3ab-default-rtdb.firebaseio.com",
+      projectId: "sales-cd3ab",
+      storageBucket: "sales-cd3ab.firebasestorage.app",
+      messagingSenderId: "570409874150",
+      appId: "1:570409874150:web:2bbd579e332539c5da0127"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const totalsRef = db.ref("salesBattle/totals");
+
+    let michaelTotal = 0;
+    let nikiTotal = 0;
+
+    const statusText = document.getElementById("statusText");
+
+    function setStatus(text) {
+      statusText.textContent = text;
+    }
+
+    function formatMoney(v){
+      return "$" + v.toLocaleString("en-AU", { maximumFractionDigits: 2 });
+    }
+
+    function updateBars(){
+      const total = michaelTotal + nikiTotal;
+      let mp = total > 0 ? Math.round(michaelTotal / total * 100) : 50;
+      let np = total > 0 ? Math.round(nikiTotal / total * 100) : 50;
+
+      document.getElementById("michaelBar").style.height = mp + "%";
+      document.getElementById("nikiBar").style.height = np + "%";
+
+      document.getElementById("michaelTotalInside").textContent = formatMoney(michaelTotal);
+      document.getElementById("nikiTotalInside").textContent = formatMoney(nikiTotal);
+    }
+
+    function saveToFirebase() {
+      totalsRef.set({
+        michael: michaelTotal,
+        niki: nikiTotal
+      }).then(() => {
+        setStatus("Saved");
+        setTimeout(() => setStatus("Connected"), 800);
+      }).catch(() => {
+        setStatus("Error saving");
+      });
+    }
+
+    function addSale(player){
+      const input = prompt("Enter sale amount (use negative for refund):");
+      if (input === null) return;
+      const v = parseFloat(input);
+      if (isNaN(v)) { alert("Not a number."); return; }
+
+      if (player === "michael") {
+        michaelTotal = Math.max(0, michaelTotal + v);
+      } else {
+        nikiTotal = Math.max(0, nikiTotal + v);
+      }
+
+      updateBars();
+      saveToFirebase();
+    }
+
+    document.getElementById("michaelAdd").onclick = () => addSale("michael");
+    document.getElementById("nikiAdd").onclick = () => addSale("niki");
+
+    totalsRef.on("value", (snapshot) => {
+      const data = snapshot.val() || {michael:0, niki:0};
+      michaelTotal = data.michael;
+      nikiTotal = data.niki;
+      updateBars();
+      setStatus("Connected");
+    }, () => setStatus("Disconnected"));
+
+    setStatus("Connecting...");
+  </script>
+</body>
+</html>
